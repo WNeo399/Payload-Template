@@ -1,7 +1,24 @@
 # To use this Dockerfile, you have to set `output: 'standalone'` in your next.config.js file.
 # From https://github.com/vercel/next.js/blob/canary/examples/with-docker/Dockerfile
 
-FROM node:22.17.0-alpine AS base
+FROM node:22.12.0-alpine AS base
+
+ARG PAYLOAD_SECRET
+ENV PAYLOAD_SECRET=${PAYLOAD_SECRET}
+ARG DATABASE_URI
+ENV DATABASE_URI=${DATABASE_URI}
+ARG S3_ACCESS_KEY_ID
+ENV S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+ARG S3_SECRET_ACCESS_KEY
+ENV S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+ARG S3_REGION
+ENV S3_REGION=${S3_REGION}
+ARG S3_BUCKET_NAME
+ENV S3_BUCKET_NAME=${S3_BUCKET_NAME}
+ARG S3_ENDPOINT
+ENV S3_ENDPOINT=${S3_ENDPOINT}
+ARG PUBLIC_DOMAIN
+ENV PUBLIC_DOMAIN=${PUBLIC_DOMAIN}
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -13,7 +30,7 @@ WORKDIR /app
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
 RUN \
   if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
+  elif [ -f package-lock.json ]; then npm install --legacy-peer-deps; \
   elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
   else echo "Lockfile not found." && exit 1; \
   fi
@@ -59,6 +76,10 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+COPY redirects.js ./
+# COPY csp.js ./
+COPY next.config.js ./
 
 USER nextjs
 
